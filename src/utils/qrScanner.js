@@ -5,6 +5,8 @@ let isScanning = false;         // Tracking state of camera streams
 let onScanCallback = null;      // Callback invoked upon successful decode
 let onErrorCallback = null;     // Callback invoked upon initialization errors
 
+let activePromise = Promise.resolve();
+
 /**
  * Initialize the camera scan viewport inside a target container.
  * @param {string} containerId - DOM ID where camera canvas will be rendered
@@ -13,53 +15,75 @@ let onErrorCallback = null;     // Callback invoked upon initialization errors
  * @param {function(string)} options.onError - Callback with error messages
  * @returns {Promise<void>}
  */
-export async function start(containerId, options = {}) {
-  // If a scan session is active, stop it before starting a new one
-  if (isScanning) {
-    await stop();
-  }
-
+export function start(containerId, options = {}) {
   onScanCallback = options.onScan || null;
   onErrorCallback = options.onError || null;
 
-  try {
-    // Instantiate html5-qrcode library wrapper on target DOM container
-    // The library must be loaded globally from CDN (window.Html5Qrcode)
-    const Html5QrcodeLib = window.Html5Qrcode;
-    if (!Html5QrcodeLib) {
-      throw new Error('Html5Qrcode library is not loaded on window.');
+  activePromise = activePromise.then(async () => {
+    if (isScanning) {
+      return;
     }
-    
-    scanner = new Html5QrcodeLib(containerId);
 
-    const config = {
-      fps: 10,                                              // Scan rate: 10 frames per second
-      qrbox: { width: 250, height: 250 },                   // Overlay box coordinates dimension
-      aspectRatio: 1.0,                                     // Square camera view window
-      formatsToSupport: [window.Html5QrcodeSupportedFormats.QR_CODE] // Restrict matching to QR Codes only
-    };
+    try {
+      // Instantiate html5-qrcode library wrapper on target DOM container
+      // The library must be loaded globally from CDN (window.Html5Qrcode)
+      const Html5QrcodeLib = window.Html5Qrcode;
+      if (!Html5QrcodeLib) {
+        throw new Error('Html5Qrcode library is not loaded on window.');
+      }
+      
+      scanner = new Html5QrcodeLib(containerId);
 
-    // Request back camera stream ('environment') and run scanner loop
-    await scanner.start(
-      { facingMode: 'environment' },
-      config,
-      onScanSuccess,
-      onScanFailure
-    );
+      const config = {
+        fps: 10,                                              // Scan rate: 10 frames per second
+        qrbox: { width: 250, height: 250 },                   // Overlay box coordinates dimension
+        aspectRatio: 1.0,                                     // Square camera view window
+        formatsToSupport: [window.Html5QrcodeSupportedFormats.QR_CODE] // Restrict matching to QR Codes only
+      };
 
-    isScanning = true;
-    console.log('[QRScanner] Started successfully');
-  } catch (err) {
-    console.error('[QRScanner] Failed to start:', err);
-    if (onErrorCallback) {
-      onErrorCallback(getCameraErrorMessage(err));
+      // Request back camera stream ('environment') and run scanner loop
+      await scanner.start(
+        { facingMode: 'environment' },
+        config,
+        onScanSuccess,
+        onScanFailure
+      );
+
+      isScanning = true;
+      console.log('[QRScanner] Started successfully');
+    } catch (err) {
+      console.error('[QRScanner] Failed to start:', err);
+      if (onErrorCallback) {
+        onErrorCallback(getCameraErrorMessage(err));
+      }
+      scanner = null;
     }
-  }
+  });
+
+  return activePromise;
 }
 
 /**
- * Callback triggered when a QR code signature is found and resolved.
+ * Turn off the camera stream, clean up canvas overlays, and reset states.
+ * @returns {Promise<void>}
  */
+export function stop() {
+  activePromise = activePromise.then(async () => {
+    if (scanner && isScanning) {
+      try {
+        await scanner.stop();
+        scanner.clear();
+        console.log('[QRScanner] Stopped and cleared');
+      } catch (err) {
+        console.warn('[QRScanner] Error stopping scanner session:', err);
+      }
+    }
+    isScanning = false;
+    scanner = null;
+  });
+
+  return activePromise;
+}
 function onScanSuccess(decodedText, decodedResult) {
   console.log('[QRScanner] Decoded text:', decodedText);
 
@@ -88,23 +112,6 @@ function onScanFailure(error) {
   // Silently ignore to avoid console logging spam
 }
 
-/**
- * Turn off the camera stream, clean up canvas overlays, and reset states.
- * @returns {Promise<void>}
- */
-export async function stop() {
-  if (scanner && isScanning) {
-    try {
-      await scanner.stop();
-      scanner.clear();
-      console.log('[QRScanner] Stopped and cleared');
-    } catch (err) {
-      console.warn('[QRScanner] Error stopping scanner session:', err);
-    }
-  }
-  isScanning = false;
-  scanner = null;
-}
 
 /**
  * Check if camera scanner stream is active.
