@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="AR Wayfinding Navigator — Scan QR codes at locations and get augmented reality directional guidance with voice navigation to your destination.">
+  <meta name="theme-color" content="#0a0e27">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <title>AR Wayfinding Navigator</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧭</text></svg>">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- External Libraries (CDN) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       VIEW 1: SPLASH SCREEN
+       ════════════════════════════════════════════════════════════════════ -->
+  <section id="view-splash" class="view splash active" aria-label="Welcome">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <div class="splash-logo-icon">🧭</div>
+        <div class="splash-logo-ring"></div>
+      </div>
+
+      <h1>AR Wayfinder</h1>
+      <p class="splash-subtitle">
+        Scan a QR code at your current location, choose your destination,
+        and follow augmented reality arrows with voice guidance.
+      </p>
+
+      <button id="btn-start-scan" class="btn btn-primary">
+        <span>📷</span> Start Scanning
+      </button>
+
+      <div style="margin-top: 24px;">
+        <button id="btn-generate-qr" class="btn btn-secondary btn-sm">
+          <span>📋</span> Generate QR Codes
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       VIEW 2: QR SCANNER
+       ════════════════════════════════════════════════════════════════════ -->
+  <section id="view-scanner" class="view scanner" aria-label="QR Scanner">
+    <div class="scanner-container">
+      <div class="scanner-header">
+        <h2>📷 Scan Location QR</h2>
+        <p id="scanner-status" class="scanner-status">Initializing camera...</p>
+      </div>
+
+      <div style="position: relative;">
+        <div id="qr-reader"></div>
+        <div class="scanner-overlay"></div>
+        <div class="scanner-corners"></div>
+        <div class="scanner-corners-bottom"></div>
+      </div>
+
+      <p id="scanner-error" class="scanner-error"></p>
+
+      <div class="scanner-actions">
+        <button id="btn-manual-id" class="btn btn-secondary btn-sm">
+          ⌨️ Enter ID Manually
+        </button>
+
+        <div id="manual-id-section" class="manual-id-section">
+          <div class="manual-input-group">
+            <input
+              type="text"
+              id="manual-location-input"
+              class="input-field"
+              placeholder="e.g. LOC_001"
+              autocomplete="off"
+              autocapitalize="characters"
+            >
+            <button id="btn-manual-submit" class="btn btn-primary btn-sm">Go</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       VIEW 3: DESTINATION SELECTION
+       ════════════════════════════════════════════════════════════════════ -->
+  <section id="view-destination" class="view destination" aria-label="Select Destination">
+    <div class="destination-container">
+      <!-- Source location card -->
+      <div id="source-info" class="source-card">
+        <div class="source-card-header">
+          <div class="source-card-icon">📍</div>
+          <div>
+            <div class="source-card-label">Your Location</div>
+            <div id="source-name" class="source-card-name">—</div>
+          </div>
+        </div>
+        <code id="source-id" class="source-card-id">—</code>
+      </div>
+
+      <!-- Destination selection -->
+      <div class="dest-section">
+        <h3>🎯 Where do you want to go?</h3>
+
+        <div class="dest-search-box">
+          <input
+            type="text"
+            id="dest-search"
+            class="input-field"
+            placeholder="🔍 Search locations..."
+            autocomplete="off"
+          >
+        </div>
+
+        <select id="dest-select" class="dest-select" aria-label="Select destination">
+          <option value="">— Select Destination —</option>
+        </select>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="dest-actions">
+        <button id="btn-rescan" class="btn btn-secondary">
+          🔄 Rescan
+        </button>
+        <button id="btn-navigate" class="btn btn-primary">
+          🧭 Navigate
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       VIEW 4: AR NAVIGATION
+       ════════════════════════════════════════════════════════════════════ -->
+  <section id="view-navigation" class="view navigation" aria-label="AR Navigation">
+    <div class="ar-wrapper">
+      <video id="ar-video" autoplay playsinline muted></video>
+      <canvas id="ar-canvas"></canvas>
+
+      <div class="nav-controls">
+        <button id="btn-stop-nav" class="btn-icon btn" title="Stop navigation" aria-label="Stop navigation">✕</button>
+        <button id="btn-next-step" class="btn-icon btn btn-next-step" title="Simulate next waypoint (testing)" aria-label="Next waypoint">⏭️</button>
+        <button id="btn-mute" class="btn-icon btn" title="Toggle audio" aria-label="Toggle audio">🔊</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       VIEW 5: QR CODE GENERATOR
+       ════════════════════════════════════════════════════════════════════ -->
+  <section id="view-qr-generator" class="view qr-generator" aria-label="QR Code Generator">
+    <div class="qr-generator-header">
+      <button id="btn-back-from-qr" class="btn btn-secondary btn-sm" style="margin-bottom: 16px;">
+        ← Back
+      </button>
+      <h2>📋 Location QR Codes</h2>
+      <p class="text-dim">Print and place these QR codes at each location</p>
+    </div>
+    <div id="qr-codes-container"></div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       JAVASCRIPT MODULES
+       Order matters: dependencies loaded before dependents
+       ════════════════════════════════════════════════════════════════════ -->
+  <script src="js/location-graph.js"></script>
+  <script src="js/compass.js"></script>
+  <script src="js/audio-guide.js"></script>
+  <script src="js/qr-scanner.js"></script>
+  <script src="js/ar-renderer.js"></script>
+  <script src="js/qr-generator.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
